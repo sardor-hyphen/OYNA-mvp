@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IELTS Speaking Practice</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --background-color: #f0f2f5;
+            --card-background: #ffffff;
+            --text-primary: #1c1e21;
+            --text-secondary: #606770;
+            --button-primary-bg: #1877f2;
+            --button-primary-hover-bg: #166fe5;
+            --button-record-bg: #fa383e;
+            --button-record-hover-bg: #e33136;
+            --button-text-color: #ffffff;
+            --light-gray-bg: #f5f6f7;
+            --divider-color: #e4e6eb;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --highlight-filler-bg: rgba(255, 230, 109, 0.6); /* Light Yellow */
+            --highlight-grammar-bg: rgba(255, 109, 109, 0.4); /* Light Red */
+            --highlight-vocabulary-bg: rgba(118, 214, 126, 0.5); /* Light Green */
+            --tooltip-bg: #333;
+            --tooltip-text: #fff;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            transition: background-color 0.3s ease;
+        }
+
+        .card {
+            background-color: var(--card-background);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px var(--shadow-color);
+            padding: 40px;
+            width: 100%;
+            max-width: 800px;
+            min-height: 450px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: all 0.4s ease-in-out;
+        }
+
+        /* --- STATE MACHINE --- */
+        .view { display: none; }
+        
+        .state-ready .question-view,
+        .state-recording .question-view,
+        .state-analyzing .analyzing-view,
+        .state-feedback .feedback-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- STAGE 1: QUESTION VIEW --- */
+        .question-view {
+            text-align: center;
+            gap: 40px;
+        }
+
+        #question-text {
+            font-size: 2.2rem;
+            font-weight: 700;
+            line-height: 1.3;
+            max-width: 90%;
+        }
+
+        #record-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border: none;
+            border-radius: 100px; /* pill-shape */
+            padding: 16px 32px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--button-text-color);
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            min-width: 250px;
+        }
+        
+        #record-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .state-ready #record-button {
+            background-color: var(--button-primary-bg);
+        }
+        .state-ready #record-button:hover {
+            background-color: var(--button-primary-hover-bg);
+        }
+        
+        .state-recording #record-button {
+            background-color: var(--button-record-bg);
+        }
+         .state-recording #record-button:hover {
+            background-color: var(--button-record-hover-bg);
+        }
+        
+        .mic-icon {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .pulsing-dot {
+            width: 12px;
+            height: 12px;
+            background-color: var(--button-text-color);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        .state-ready .pulsing-dot,
+        .state-recording .mic-icon {
+            display: none;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.8); opacity: 0.5; }
+        }
+
+
+        /* --- STAGE 2: ANALYZING VIEW --- */
+        .analyzing-view {
+            gap: 24px;
+            color: var(--text-secondary);
+        }
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 6px solid var(--light-gray-bg);
+            border-top-color: var(--button-primary-bg);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        .analyzing-view p {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* --- STAGE 3: FEEDBACK VIEW --- */
+        .feedback-view {
+            width: 100%;
+            align-items: flex-start;
+        }
+        
+        .feedback-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 40px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+
+        .transcript-panel h2, .metrics-panel h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        #transcript-container {
+            background-color: var(--light-gray-bg);
+            border-radius: 8px;
+            padding: 24px;
+            line-height: 2.2;
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+        }
+        
+        .highlight {
+            position: relative;
+            padding: 2px 4px;
+            border-radius: 4px;
+            cursor: help;
+        }
+        
+        .highlight.filler { background-color: var(--highlight-filler-bg); }
+        .highlight.grammar { background-color: var(--highlight-grammar-bg); }
+        .highlight.vocabulary { background-color: var(--highlight-vocabulary-bg); }
+        
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            background-color: var(--tooltip-bg);
+            color: var(--tooltip-text);
+            padding: 12px;
+            border-radius: 6px;
+            z-index: 10;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            text-align: left;
+            transition: opacity 0.2s, visibility 0.2s;
+            pointer-events: none;
+        }
+
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--tooltip-bg) transparent transparent transparent;
+        }
+        
+        .tooltip .suggestion {
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 6px;
+        }
+
+        .highlight:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .metrics-list {
+            list-style: none;
+            margin-bottom: 24px;
+        }
+        
+        .metrics-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1rem;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--divider-color);
+        }
+        
+        .metrics-list li:first-child {
+            border-top: 1px solid var(--divider-color);
+        }
+        
+        .metrics-list .metric-value {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--text-primary);
+        }
+        
+        .overall-suggestion-box {
+            background-color: var(--light-gray-bg);
+            border-left: 4px solid var(--button-primary-bg);
+            padding: 16px;
+            border-radius: 4px;
+        }
+        
+        .overall-suggestion-box h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+        
+        #overall-suggestion-text {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .action-footer {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        #try-again-button {
+            background-color: var(--button-primary-bg);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        #try-again-button:hover {
+             background-color: var(--button-primary-hover-bg);
+        }
+
+
+    </style>
+</head>
+<body class="state-ready">
+
+    <div class="card">
+        
+        <!-- STAGE 1: QUESTION VIEW (Also used for Recording) -->
+        <div class="view question-view">
+            <p id="question-text">Describe a person you admire.</p>
+            <button id="record-button">
+                <span id="record-button-text">Start Answering</span>
+                <svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"></path></svg>
+                <div class="pulsing-dot"></div>
+            </button>
+        </div>
+
+        <!-- STAGE 2: ANALYZING VIEW -->
+        <div class="view analyzing-view">
+            <div class="loader"></div>
+            <p>Analyzing your response...</p>
+        </div>
+
+        <!-- STAGE 3: FEEDBACK VIEW -->
+        <div class="view feedback-view">
+            <div class="feedback-grid">
+                <div class="transcript-panel">
+                    <h2>Your Answer Analysis</h2>
+                    <div id="transcript-container">
+                        <!-- Dynamic content will be injected here -->
+                    </div>
+                </div>
+                <div class="metrics-panel">
+                    <h2>Metrics</h2>
+                    <ul class="metrics-list">
+                        <li>Words/Min <span id="wpm-metric" class="metric-value">-</span></li>
+                        <li>Clarity <span id="clarity-metric" class="metric-value">-</span></li>
+                    </ul>
+                    <div class="overall-suggestion-box">
+                        <h3>Overall Suggestion</h3>
+                        <p id="overall-suggestion-text"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="action-footer">
+                <button id="try-again-button">Try Another Question</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const body = document.body;
+            const recordButton = document.getElementById('record-button');
+            const recordButtonText = document.getElementById('record-button-text');
+            const tryAgainButton = document.getElementById('try-again-button');
+            const transcriptContainer = document.getElementById('transcript-container');
+            const wpmMetric = document.getElementById('wpm-metric');
+            const clarityMetric = document.getElementById('clarity-metric');
+            const overallSuggestionText = document.getElementById('overall-suggestion-text');
+
+            // --- State Management ---
+            let currentState = 'ready'; // ready, recording, analyzing, feedback
+            let recognition;
+            let finalTranscript = '';
+
+            const setState = (newState) => {
+                body.className = `state-${newState}`;
+                currentState = newState;
+            };
+
+            // --- Speech Recognition Setup ---
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+
+                recognition.onstart = () => {
+                    setState('recording');
+                    recordButtonText.textContent = 'Stop Recording';
+                };
+
+                recognition.onresult = (event) => {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            transcript += event.results[i][0].transcript;
+                        }
+                    }
+                    finalTranscript += transcript;
+                };
+
+                recognition.onerror = (event) => {
+                    console.error("Speech recognition error:", event.error);
+                    alert(`Error: ${event.error}. Please ensure you have granted microphone permissions.`);
+                    resetToReadyState();
+                };
+
+                recognition.onend = () => {
+                    if (currentState === 'recording') {
+                        // This means stop was clicked
+                        setState('analyzing');
+                        processTranscript();
+                    }
+                };
+            } else {
+                alert("Sorry, your browser doesn't support the Speech Recognition API. Please try Chrome or Edge.");
+                recordButton.disabled = true;
+            }
+            
+            // --- Core AI Logic (Prime Directive) ---
+            const analyzeTranscript = (transcript) => {
+                const targetTranscript = "Well, a person that I admire is my father. The reason why I admire him is because he is my father and he has brought me up and I really love him.";
+                
+                // Normalize transcript for comparison
+                const normalizedTranscript = transcript.trim().replace(/\s+/g, ' ');
+
+                if (normalizedTranscript === targetTranscript) {
+                    return {
+                      "wpm": 118,
+                      "clarity_score": 72,
+                      "overall_suggestion": "Your answer is understandable but uses repetitive and simple phrasing. To improve, provide specific reasons and examples of *why* you admire him, and use more advanced vocabulary.",
+                      "annotations": [
+                        { "type": "filler", "original_span": "Well,", "suggestion": "(Omit)", "reason": "This is a common filler word. Starting your sentence directly often sounds more confident." },
+                        { "type": "grammar", "original_span": "The reason why I admire him is because", "suggestion": "I admire him because", "reason": "This is a redundant construction. 'The reason is because' can be simplified to just 'because'." },
+                        { "type": "vocabulary", "original_span": "brought me up", "suggestion": "raised me", "reason": "'Raised me' is a more formal and sophisticated alternative to the phrasal verb 'brought me up'." },
+                        { "type": "vocabulary", "original_span": "I really love him", "suggestion": "I hold him in high regard", "reason": "This phrase uses more advanced, formal vocabulary to express respect and admiration, which is ideal for an exam context." }
+                      ]
+                    };
+                } else {
+                    // Default response for non-matching transcripts
+                    return {
+                        "wpm": transcript.split(' ').length * 10, // A rough estimate
+                        "clarity_score": Math.floor(Math.random() * 20) + 60, // Random score
+                        "overall_suggestion": "Good effort. Try being more descriptive and use a wider range of vocabulary. For a detailed analysis, try saying the target phrase.",
+                        "annotations": []
+                    };
+                }
+            };
+            
+            // --- Rendering Mandate ---
+            const renderFeedback = (analysis) => {
+                // 1. Populate Metrics
+                wpmMetric.textContent = analysis.wpm;
+                clarityMetric.textContent = `${analysis.clarity_score}%`;
+                overallSuggestionText.textContent = analysis.overall_suggestion;
+
+                // 2. Generate Highlighted Transcript
+                let annotatedHtml = finalTranscript;
+                if(analysis.annotations.length > 0) {
+                    // Sort annotations by position to handle replacements correctly
+                    analysis.annotations.sort((a, b) => finalTranscript.indexOf(b.original_span) - finalTranscript.indexOf(a.original_span));
+                    
+                    analysis.annotations.forEach(ann => {
+                        const escapedSpan = ann.original_span.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp(escapedSpan, 'g');
+                        
+                        const replacementHtml = `
+                            <span class="highlight ${ann.type}">
+                                ${ann.original_span}
+                                <div class="tooltip">
+                                    <span class="suggestion">${ann.suggestion}</span>
+                                    ${ann.reason}
+                                </div>
+                            </span>`;
+                        annotatedHtml = annotatedHtml.replace(regex, replacementHtml);
+                    });
+                }
+                
+                transcriptContainer.innerHTML = annotatedHtml || "Could not transcribe your speech. Please try again.";
+
+                // 3. Switch to Feedback view
+                setState('feedback');
+            };
+            
+            const processTranscript = () => {
+                // Simulate network latency for a better UX
+                setTimeout(() => {
+                    const analysisResult = analyzeTranscript(finalTranscript);
+                    renderFeedback(analysisResult);
+                }, 2000); // 2-second analysis simulation
+            };
+
+            const resetToReadyState = () => {
+                finalTranscript = '';
+                setState('ready');
+                recordButtonText.textContent = 'Start Answering';
+            };
+
+            // --- Event Listeners ---
+            recordButton.addEventListener('click', () => {
+                if (!recognition) return;
+
+                if (currentState === 'ready') {
+                    finalTranscript = '';
+                    recognition.start();
+                } else if (currentState === 'recording') {
+                    recognition.stop();
+                }
+            });
+
+            tryAgainButton.addEventListener('click', resetToReadyState);
+            
+            // Initial setup
+            setState('ready');
+        });
+    </script>
+</body>
+</html>

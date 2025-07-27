@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full IELTS Speaking Session</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --background-color: #f0f2f5;
+            --card-background: #ffffff;
+            --text-primary: #1c1e21;
+            --text-secondary: #606770;
+            --text-tertiary: #8a8d91;
+            --button-primary-bg: #1877f2;
+            --button-primary-hover-bg: #166fe5;
+            --button-record-bg: #fa383e;
+            --button-record-hover-bg: #e33136;
+            --button-text-color: #ffffff;
+            --light-gray-bg: #f5f6f7;
+            --divider-color: #e4e6eb;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --highlight-filler-bg: rgba(255, 230, 109, 0.6);
+            --highlight-grammar-bg: rgba(255, 109, 109, 0.4);
+            --highlight-vocabulary-bg: rgba(118, 214, 126, 0.5);
+            --tooltip-bg: #333;
+            --tooltip-text: #fff;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .card {
+            background-color: var(--card-background);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px var(--shadow-color);
+            padding: 40px;
+            width: 100%;
+            max-width: 850px;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.4s ease-in-out;
+        }
+        
+        /* --- STATE MACHINE & VIEWS --- */
+        .view { display: none; }
+        .state-start .start-view,
+        .state-part1-question .question-view,
+        .state-part1-recording .question-view,
+        .state-part2-prep .part2-prep-view,
+        .state-part2-speaking .question-view,
+        .state-part3-question .question-view,
+        .state-part3-recording .question-view,
+        .state-analyzing .analyzing-view,
+        .state-feedback .feedback-view {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* --- STAGE 0: START VIEW --- */
+        .start-view {
+            align-items: center;
+            text-align: center;
+            gap: 25px;
+        }
+        .start-view h1 { font-size: 2.5rem; }
+        .start-view p { font-size: 1.1rem; color: var(--text-secondary); line-height: 1.6; max-width: 600px; }
+        .start-view ul { list-style: none; text-align: left; background: var(--light-gray-bg); padding: 20px; border-radius: 8px; margin: 10px 0;}
+        .start-view li { margin-bottom: 10px; }
+        .start-view li strong { color: var(--text-primary); }
+        #start-test-button { margin-top: 20px; }
+
+
+        /* --- SHARED: QUESTION VIEW --- */
+        .question-view {
+            text-align: center;
+            justify-content: center;
+            flex-grow: 1;
+            gap: 40px;
+        }
+        #question-text { font-size: 2.2rem; font-weight: 700; line-height: 1.3; max-width: 90%; }
+        #record-button, #start-test-button, #try-again-button {
+            display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+            border: none; border-radius: 100px; padding: 16px 32px; font-size: 1.1rem;
+            font-weight: 600; color: var(--button-text-color); cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            background-color: var(--button-primary-bg); min-width: 250px;
+        }
+        #record-button:hover, #start-test-button:hover, #try-again-button:hover { transform: translateY(-2px); background-color: var(--button-primary-hover-bg); }
+        .state-part1-recording #record-button, .state-part2-speaking #record-button, .state-part3-recording #record-button { background-color: var(--button-record-bg); }
+        .state-part1-recording #record-button:hover, .state-part2-speaking #record-button:hover, .state-part3-recording #record-button:hover { background-color: var(--button-record-hover-bg); }
+        .mic-icon { width: 24px; height: 24px; }
+        .pulsing-dot { width: 12px; height: 12px; background-color: var(--button-text-color); border-radius: 50%; animation: pulse 1.5s infinite ease-in-out; }
+        .state-part1-question .pulsing-dot, .state-part1-recording .mic-icon,
+        .state-part2-speaking .mic-icon, .state-part3-question .pulsing-dot, 
+        .state-part3-recording .mic-icon { display: none; }
+        @keyframes pulse { 0% { transform: scale(0.8); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(0.8); opacity: 0.5; } }
+
+        /* --- STAGE 2: PREP VIEW --- */
+        .part2-prep-view { text-align: center; gap: 20px; }
+        .part2-prep-view h2 { font-size: 1.5rem; color: var(--text-secondary); }
+        #cue-card { background: var(--light-gray-bg); padding: 30px; border-radius: 12px; border-left: 5px solid var(--button-primary-bg); text-align: left; margin-bottom: 20px; }
+        #cue-card-topic { font-size: 1.4rem; font-weight: 600; margin-bottom: 20px; }
+        #cue-card-points { list-style-position: inside; padding-left: 10px; font-size: 1.1rem; line-height: 1.8; color: var(--text-secondary); }
+        #prep-timer { font-size: 2.5rem; font-weight: 700; color: var(--button-primary-bg); }
+
+        /* --- ANALYZING VIEW --- */
+        .analyzing-view { align-items: center; justify-content: center; flex-grow: 1; gap: 24px; color: var(--text-secondary); }
+        .loader { width: 60px; height: 60px; border: 6px solid var(--light-gray-bg); border-top-color: var(--button-primary-bg); border-radius: 50%; animation: spin 1s linear infinite; }
+        .analyzing-view p { font-size: 1.2rem; font-weight: 600; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- FINAL FEEDBACK VIEW --- */
+        .feedback-view { align-items: flex-start; gap: 20px; }
+        .feedback-tabs { display: flex; border-bottom: 1px solid var(--divider-color); margin-bottom: 25px; }
+        .tab-button { background: none; border: none; padding: 15px 25px; font-size: 1.1rem; font-weight: 600; cursor: pointer; color: var(--text-secondary); border-bottom: 3px solid transparent; transition: color 0.2s, border-color 0.2s; }
+        .tab-button.active { color: var(--button-primary-bg); border-bottom-color: var(--button-primary-bg); }
+        .tab-content { display: none; width: 100%; animation: fadeIn 0.4s; }
+        .tab-content.active { display: block; }
+
+        /* Overall Tab */
+        #overall-content .feedback-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        .metrics-panel h3, .suggestion-panel h3 { font-size: 1.5rem; margin-bottom: 20px; }
+        .metrics-list { list-style: none; }
+        .metrics-list li { display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; padding: 12px 0; border-bottom: 1px solid var(--divider-color); }
+        .metrics-list li:first-child { border-top: 1px solid var(--divider-color); }
+        .metric-value { font-weight: 700; font-size: 1.2rem; color: var(--text-primary); }
+        #overall-suggestion-text { font-size: 1.05rem; line-height: 1.7; color: var(--text-secondary); background: var(--light-gray-bg); padding: 20px; border-radius: 8px; }
+
+        /* Part-specific Tabs */
+        .part-feedback-item { margin-bottom: 35px; }
+        .part-feedback-item:last-child { margin-bottom: 0; }
+        .part-feedback-item .question { font-weight: 600; font-size: 1.1rem; color: var(--text-primary); margin-bottom: 12px; padding-left: 15px; border-left: 3px solid var(--button-primary-bg); }
+        .transcript-container { background-color: var(--light-gray-bg); border-radius: 8px; padding: 24px; line-height: 2.2; font-size: 1.1rem; color: var(--text-secondary); }
+        .highlight { position: relative; padding: 2px 4px; border-radius: 4px; cursor: help; }
+        .highlight.filler { background-color: var(--highlight-filler-bg); }
+        .highlight.grammar { background-color: var(--highlight-grammar-bg); }
+        .highlight.vocabulary { background-color: var(--highlight-vocabulary-bg); }
+        .tooltip { visibility: hidden; opacity: 0; position: absolute; background-color: var(--tooltip-bg); color: var(--tooltip-text); padding: 12px; border-radius: 6px; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%); width: 280px; font-size: 0.9rem; line-height: 1.5; text-align: left; transition: opacity 0.2s, visibility 0.2s; pointer-events: none; }
+        .tooltip::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: var(--tooltip-bg) transparent transparent transparent; }
+        .tooltip .suggestion { font-weight: 600; display: block; margin-bottom: 8px; border-bottom: 1px solid #555; padding-bottom: 6px; }
+        .highlight:hover .tooltip { visibility: visible; opacity: 1; }
+        .action-footer { width: 100%; display: flex; justify-content: flex-end; margin-top: 20px; }
+    </style>
+</head>
+
+<body class="state-start">
+
+    <div class="card">
+        
+        <!-- STAGE 0: START VIEW -->
+        <div class="view start-view">
+            <h1>IELTS Speaking Test Simulator</h1>
+            <p>Welcome! This is a complete simulation of the IELTS speaking test. You will go through all three parts. Please ensure you are in a quiet environment.</p>
+            <ul>
+                <li><strong>Part 1:</strong> Introduction & Interview (4-5 questions)</li>
+                <li><strong>Part 2:</strong> Cue Card Long Turn (1 min prep, 2 min talk)</li>
+                <li><strong>Part 3:</strong> Discussion (4-5 questions)</li>
+            </ul>
+            <button id="start-test-button">Begin Test</button>
+        </div>
+
+        <!-- STAGE 1, 2, 3: QUESTION & RECORDING VIEW -->
+        <div class="view question-view">
+            <p id="question-text"></p>
+            <div id="part2-timer-display" style="display: none;">
+                <p style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 10px;">Time Remaining</p>
+                <div id="speaking-timer" style="font-size: 2.5rem; font-weight: 700;">2:00</div>
+            </div>
+            <button id="record-button">
+                <span id="record-button-text">Start Answering</span>
+                <svg class="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"></path></svg>
+                <div class="pulsing-dot"></div>
+            </button>
+        </div>
+
+        <!-- STAGE 2: PREPARATION VIEW -->
+        <div class="view part2-prep-view">
+            <h2>Part 2: Cue Card</h2>
+            <p>You have <strong>1 minute</strong> to prepare your answer. You can make notes.</p>
+            <div id="cue-card">
+                <p id="cue-card-topic"></p>
+                <ul id="cue-card-points"></ul>
+            </div>
+            <div id="prep-timer">1:00</div>
+        </div>
+
+        <!-- FINAL ANALYSIS VIEW -->
+        <div class="view analyzing-view">
+            <div class="loader"></div>
+            <p>Generating your final report...</p>
+        </div>
+
+        <!-- FINAL FEEDBACK REPORT VIEW -->
+        <div class="view feedback-view">
+            <nav class="feedback-tabs">
+                <button class="tab-button active" data-tab="overall">Overall</button>
+                <button class="tab-button" data-tab="part1">Part 1</button>
+                <button class="tab-button" data-tab="part2">Part 2</button>
+                <button class="tab-button" data-tab="part3">Part 3</button>
+            </nav>
+
+            <div id="overall-content" class="tab-content active">
+                <div class="feedback-grid">
+                    <div class="metrics-panel">
+                        <h3>Overall Metrics</h3>
+                        <ul class="metrics-list">
+                            <li>Avg. Words/Min <span id="avg-wpm-metric" class="metric-value">-</span></li>
+                            <li>Avg. Clarity <span id="avg-clarity-metric" class="metric-value">-</span></li>
+                            <li>Filler Word Count <span id="filler-count-metric" class="metric-value">-</span></li>
+                        </ul>
+                    </div>
+                    <div class="suggestion-panel">
+                        <h3>Overall Suggestion</h3>
+                        <p id="overall-suggestion-text"></p>
+                    </div>
+                </div>
+            </div>
+            <div id="part1-content" class="tab-content"></div>
+            <div id="part2-content" class="tab-content"></div>
+            <div id="part3-content" class="tab-content"></div>
+
+            <div class="action-footer">
+                <button id="try-again-button">Take Another Test</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DATA & CONFIG ---
+        const questionBank = {
+            part1: [
+                "Describe a person you admire.", // Prime Directive Question
+                "What do you usually do on weekends?",
+                "Tell me about your hometown.",
+                "Do you prefer reading books or watching movies?"
+            ],
+            part2: {
+                topic: "Describe a website you visit often.",
+                points: [
+                    "What it is.",
+                    "How you found it.",
+                    "How often you visit it, and why."
+                ]
+            },
+            part3: [
+                "How has the internet changed social interactions?",
+                "What are the pros and cons of online shopping?",
+                "Do you think all information on the internet is reliable?",
+                "How will the internet evolve in the future?"
+            ]
+        };
+
+        const testSession = {
+            part1: [], part2: [], part3: []
+        };
+        
+        // --- DOM Elements ---
+        const dom = {
+            body: document.body,
+            recordButton: document.getElementById('record-button'),
+            recordButtonText: document.getElementById('record-button-text'),
+            startTestButton: document.getElementById('start-test-button'),
+            tryAgainButton: document.getElementById('try-again-button'),
+            questionText: document.getElementById('question-text'),
+            cueCardTopic: document.getElementById('cue-card-topic'),
+            cueCardPoints: document.getElementById('cue-card-points'),
+            prepTimer: document.getElementById('prep-timer'),
+            speakingTimer: document.getElementById('speaking-timer'),
+            part2TimerDisplay: document.getElementById('part2-timer-display'),
+            feedbackTabs: document.querySelector('.feedback-tabs'),
+            tabContents: document.querySelectorAll('.tab-content'),
+        };
+
+        // --- State Management ---
+        let currentState = 'start';
+        let currentPart = 1;
+        let currentQuestionIndex = 0;
+        let recognition;
+        let finalTranscript = '';
+        let timerInterval;
+
+        const setState = (newState) => {
+            dom.body.className = `state-${newState}`;
+            currentState = newState;
+        };
+
+        // --- Speech Recognition ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+            
+            recognition.onresult = (event) => {
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript.trim() + '. ';
+                }
+            };
+            recognition.onerror = (event) => console.error("Speech recognition error:", event.error);
+            recognition.onend = () => { if (currentState.includes('recording')) handleRecordingStop(); };
+        } else {
+            alert("Speech Recognition API not supported. Please use Chrome or Edge.");
+        }
+
+        // --- Core Flow Control ---
+        const nextStep = () => {
+            if (currentPart === 1) {
+                if (currentQuestionIndex < questionBank.part1.length) {
+                    showQuestion(1, currentQuestionIndex);
+                } else {
+                    currentPart = 2;
+                    currentQuestionIndex = 0;
+                    startPart2Prep();
+                }
+            } else if (currentPart === 2) {
+                currentPart = 3;
+                currentQuestionIndex = 0;
+                nextStep(); // Move to part 3
+            } else if (currentPart === 3) {
+                if (currentQuestionIndex < questionBank.part3.length) {
+                    showQuestion(3, currentQuestionIndex);
+                } else {
+                    finalizeTest();
+                }
+            }
+        };
+
+        const showQuestion = (part, index) => {
+            const question = part === 1 ? questionBank.part1[index] : questionBank.part3[index];
+            dom.questionText.textContent = question;
+            dom.recordButtonText.textContent = 'Start Answering';
+            dom.part2TimerDisplay.style.display = 'none';
+            setState(`part${part}-question`);
+        };
+
+        // --- Part 2 Specific Logic ---
+        const startPart2Prep = () => {
+            setState('part2-prep');
+            dom.cueCardTopic.textContent = questionBank.part2.topic;
+            dom.cueCardPoints.innerHTML = questionBank.part2.points.map(p => `<li>${p}</li>`).join('');
+            let timeLeft = 60;
+            dom.prepTimer.textContent = `1:00`;
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                dom.prepTimer.textContent = `0:${timeLeft < 10 ? '0' : ''}${timeLeft}`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    startPart2Speaking();
+                }
+            }, 1000);
+        };
+        
+        const startPart2Speaking = () => {
+            dom.questionText.textContent = questionBank.part2.topic;
+            dom.part2TimerDisplay.style.display = 'block';
+            setState('part2-speaking');
+            toggleRecording();
+
+            let timeLeft = 120; // 2 minutes
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                dom.speakingTimer.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    if (currentState.includes('speaking')) toggleRecording(); // Auto-stop
+                }
+            }, 1000);
+        };
+        
+        // --- Recording Logic ---
+        const toggleRecording = () => {
+            if (!recognition) return;
+            const isRecording = currentState.includes('recording');
+            if (!isRecording) {
+                finalTranscript = '';
+                recognition.start();
+                setState(`part${currentPart}-recording`);
+                dom.recordButtonText.textContent = 'Stop Recording';
+            } else {
+                recognition.stop();
+                clearInterval(timerInterval); // Stop any active timers
+            }
+        };
+
+        const handleRecordingStop = () => {
+            const question = currentPart === 1 ? questionBank.part1[currentQuestionIndex] :
+                             currentPart === 2 ? questionBank.part2.topic :
+                             questionBank.part3[currentQuestionIndex];
+            
+            const analysis = analyzeTranscript(finalTranscript);
+            const answerData = { question, transcript: finalTranscript, analysis };
+            
+            testSession[`part${currentPart}`].push(answerData);
+
+            currentQuestionIndex++;
+            nextStep();
+        };
+
+        // --- Analysis & Feedback ---
+        const finalizeTest = () => {
+            setState('analyzing');
+            setTimeout(() => {
+                renderFinalReport();
+                setState('feedback');
+            }, 2500);
+        };
+        
+        const analyzeTranscript = (transcript) => {
+            // PRIME DIRECTIVE LOGIC
+            const primeDirectiveTarget = "Well, a person that I admire is my father. The reason why I admire him is because he is my father and he has brought me up and I really love him.";
+            if (transcript.trim().replace(/\s+/g, ' ').startsWith(primeDirectiveTarget.slice(0,-1))) {
+                return {
+                    wpm: 118, clarity_score: 72,
+                    annotations: [
+                        { "type": "filler", "original_span": "Well,", "suggestion": "(Omit)", "reason": "A common filler word." },
+                        { "type": "grammar", "original_span": "The reason why I admire him is because", "suggestion": "I admire him because", "reason": "This is redundant." },
+                        { "type": "vocabulary", "original_span": "brought me up", "suggestion": "raised me", "reason": "A more formal alternative." },
+                        { "type": "vocabulary", "original_span": "I really love him", "suggestion": "I hold him in high regard", "reason": "Uses more advanced vocabulary." }
+                    ]
+                };
+            }
+            // Generic mock analysis for other answers
+            return {
+                wpm: Math.floor(transcript.split(' ').length * (60 / 15)) || 100, // rough WPM
+                clarity_score: Math.floor(Math.random() * 15) + 80, // 80-95
+                annotations: transcript.includes("I think") ? [{type: "filler", original_span: "I think", suggestion: "(Omit)", reason: "Try stating your opinion directly for more impact."}] : []
+            };
+        };
+
+        const renderFinalReport = () => {
+            // Overall Tab
+            let totalWPM = 0, totalClarity = 0, totalAnswers = 0, totalFillers = 0;
+            const allAnswers = [...testSession.part1, ...testSession.part2, ...testSession.part3];
+            allAnswers.forEach(ans => {
+                totalWPM += ans.analysis.wpm;
+                totalClarity += ans.analysis.clarity_score;
+                totalFillers += ans.analysis.annotations.filter(a => a.type === 'filler').length;
+                totalAnswers++;
+            });
+            document.getElementById('avg-wpm-metric').textContent = Math.round(totalWPM / totalAnswers) || 0;
+            document.getElementById('avg-clarity-metric').textContent = `${Math.round(totalClarity / totalAnswers) || 0}%`;
+            document.getElementById('filler-count-metric').textContent = totalFillers;
+            document.getElementById('overall-suggestion-text').textContent = "Your pace is generally good. Focus on reducing filler words and using a wider range of vocabulary to express your ideas more precisely. Your grammar seems solid, but there are opportunities to use more complex sentence structures, especially in Part 3.";
+
+            // Part-specific Tabs
+            ['part1', 'part2', 'part3'].forEach(partKey => {
+                const container = document.getElementById(`${partKey}-content`);
+                let html = '';
+                testSession[partKey].forEach(item => {
+                    html += `
+                        <div class="part-feedback-item">
+                            <p class="question">${item.question}</p>
+                            <div class="transcript-container">${renderAnnotatedTranscript(item.transcript, item.analysis.annotations)}</div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html || "<p>No answers recorded for this part.</p>";
+            });
+        };
+
+        const renderAnnotatedTranscript = (transcript, annotations) => {
+            if (!annotations || annotations.length === 0) return transcript;
+            let annotatedHtml = transcript;
+            annotations.sort((a, b) => transcript.indexOf(b.original_span) - transcript.indexOf(a.original_span));
+            annotations.forEach(ann => {
+                const replacementHtml = `
+                    <span class="highlight ${ann.type}">
+                        ${ann.original_span}
+                        <div class="tooltip"><span class="suggestion">${ann.suggestion}</span>${ann.reason}</div>
+                    </span>`;
+                annotatedHtml = annotatedHtml.replace(ann.original_span, replacementHtml);
+            });
+            return annotatedHtml;
+        };
+        
+        // --- Event Listeners ---
+        dom.startTestButton.addEventListener('click', () => nextStep());
+        dom.recordButton.addEventListener('click', () => toggleRecording());
+        dom.tryAgainButton.addEventListener('click', () => window.location.reload());
+
+        dom.feedbackTabs.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tab-button')) {
+                dom.feedbackTabs.querySelector('.active').classList.remove('active');
+                e.target.classList.add('active');
+                dom.tabContents.forEach(content => content.classList.remove('active'));
+                document.getElementById(`${e.target.dataset.tab}-content`).classList.add('active');
+            }
+        });
+    });
+    </script>
+</body>
+</html>

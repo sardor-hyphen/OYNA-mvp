@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Video Speech Coach</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --panel-bg: #161b22;
+            --border-color: #30363d;
+            --text-light: #e6edf3;
+            --text-dark: #7d8590;
+            --primary-accent: #2f81f7;
+            --success-color: #3fb950;
+            --error-color: #f85149;
+            --highlight-bg-color: #1c2744;
+            --highlight-text-color: #ffffff;
+            --replay-highlight-color: #f7b731;
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        #app-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- Practice View Layout --- */
+        .practice-view-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            grid-template-rows: 1fr 80px;
+            grid-template-areas:
+                "left-panel right-panel"
+                "footer     footer";
+            height: 100%;
+            padding: 1rem;
+            gap: 1rem;
+            box-sizing: border-box;
+        }
+        .left-panel { grid-area: left-panel; display: flex; flex-direction: column;}
+        .right-panel { grid-area: right-panel; }
+        .footer { grid-area: footer; }
+        
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+        #script-input-panel { height: 100%; }
+        #script-input {
+            flex-grow: 1; background: var(--bg-color); color: var(--text-light); border: 1px solid var(--border-color);
+            border-radius: 6px; padding: 1rem; font-size: 0.95rem; line-height: 1.6; resize: none; box-sizing: border-box; margin-bottom: 1rem;
+        }
+        #prepare-btn {
+            width: 100%; padding: 12px; font-size: 1rem; font-weight: 500; border: none; border-radius: 6px;
+            cursor: pointer; background-color: var(--primary-accent); color: white; transition: background-color 0.2s;
+        }
+        #prepare-btn:hover:not(:disabled) { background-color: #4895fa; }
+        #prepare-btn:disabled { background-color: var(--text-dark); cursor: not-allowed; }
+
+        /* Video Preview Styles */
+        #camera-preview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            transform: scaleX(-1); /* Mirror effect */
+            border-radius: 6px;
+        }
+        #caption-content {
+             position: relative;
+             z-index: 2;
+             background: rgba(13, 17, 23, 0.5); /* Semi-transparent overlay for readability */
+             height: 100%;
+             overflow-y: auto;
+             padding: 2rem;
+             scroll-behavior: smooth;
+        }
+
+        .script-chunk {
+            display: block; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; font-size: 1.75rem;
+            line-height: 1.6; color: var(--text-dark); transition: background-color 0.3s ease, color 0.3s ease;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+        }
+        .script-chunk.highlighted-chunk { background-color: var(--highlight-bg-color); color: var(--highlight-text-color); }
+        .placeholder { color: var(--text-dark); font-size: 2rem; text-align: center; margin: auto 0; }
+        .footer { height: 80px; display: flex; justify-content: center; align-items: center; }
+        #record-toggle-btn {
+            width: 56px; height: 56px; border-radius: 50%; border: 2px solid var(--border-color); background-color: transparent;
+            cursor: pointer; display: flex; justify-content: center; align-items: center; transition: all 0.3s;
+        }
+        #record-toggle-btn.recording { border-color: var(--error-color); }
+        #record-toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* --- Analysis View --- */
+        .analysis-view-container { padding: 2rem 4rem; height: 100vh; box-sizing: border-box; overflow-y: auto; }
+        .analysis-view-container h1 { font-size: 2.5rem; margin: 0 0 0.5rem 0; }
+        .analysis-view-container .subtitle { font-size: 1.2rem; color: var(--text-dark); margin: 0 0 2rem 0; }
+        .feedback-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .metric { background: var(--panel-bg); padding: 1.5rem; border-radius: 12px; }
+        .metric-label { font-size: 1rem; color: var(--text-dark); display: block; margin-bottom: 0.5rem; }
+        .metric-value { font-size: 2.5rem; font-weight: 700; color: var(--text-light); }
+        .metric-value .unit { font-size: 1rem; color: var(--text-dark); margin-left: 4px; }
+        .analysis-section { margin-bottom: 2rem; }
+        .analysis-section h2 { border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; }
+        #transcript-comparison { font-family: 'SF Mono', 'Consolas', monospace; line-height: 1.8; background-color: var(--panel-bg); padding: 1.5rem; border-radius: 8px; white-space: pre-wrap; }
+        .correct-word { color: var(--success-color); }
+        .incorrect-word { color: var(--error-color); }
+        
+        .playback-area { display: flex; gap: 2rem; align-items: flex-start; }
+        .video-container { flex: 0 0 50%; } /* Video takes up half the space */
+        .tips-container { flex-grow: 1; }
+        #video-player { width: 100%; border-radius: 8px; background: black; }
+        #replay-transcript { font-size: 1.5rem; line-height: 2; padding: 1rem; background: var(--panel-bg); border-radius: 8px; }
+        #replay-transcript .replay-word { transition: background-color 0.1s; }
+        #replay-transcript .replay-word.active { background-color: var(--replay-highlight-color); color: var(--bg-color); border-radius: 4px; }
+        .analysis-actions { display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; padding-bottom: 2rem; }
+        .btn-analysis { padding: 12px 24px; font-size: 1rem; border:none; border-radius: 8px; cursor: pointer; }
+        
+        /* Feedback Modal Styles */
+        #feedback-modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+            width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7);
+            align-items: center; justify-content: center;
+        }
+        #feedback-modal-content {
+            background-color: var(--panel-bg); margin: auto; padding: 2rem;
+            border: 1px solid var(--border-color); width: 90%; max-width: 700px; border-radius: 12px;
+            text-align: center;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div id="app-container"></div>
+
+    <!-- FEEDBACK MODAL (Initially Hidden) -->
+    <div id="feedback-modal">
+        <div id="feedback-modal-content">
+            <h2>Help Us Improve!</h2>
+            <p style="color: var(--text-dark); margin-bottom: 1.5rem;">Your anonymous feedback is vital for improving this tool. You will only see this once.</p>
+            <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSf0bsN6vjCfpI6SWsWOPCNds4gSkvxal03k_sAr8lpTnFS_aw/viewform?embedded=true" width="100%" height="450" frameborder="0" marginheight="0" marginwidth="0">Loading…</iframe>
+            <button id="close-feedback-btn" class="btn-analysis" style="background-color:var(--primary-accent); color:white; margin-top: 1.5rem;">Close & Practice Again</button>
+        </div>
+    </div>
+
+
+<script>
+    // --- DOM ELEMENT REFERENCES (populated by render functions) ---
+    const appContainer = document.getElementById('app-container');
+
+    const ICONS = {
+        record: `<svg width="24" height="24" viewBox="0 0 24 24" fill="#f85149"><circle cx="12" cy="12" r="10"></circle></svg>`,
+        stop: `<svg width="20" height="20" viewBox="0 0 24 24" fill="#e6edf3"><rect x="6" y="6" width="12" height="12"></rect></svg>`,
+    };
+
+    // --- GLOBAL STATE MANAGEMENT ---
+    const OPENROUTER_API_KEY = "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";
+    let fullScript = [], normalizedScriptChunks = [];
+    let recognition, mediaRecorder, mediaStream, videoChunks = [], videoUrl = null;
+    let isRecording = false;
+    let performanceMetrics = {};
+    let lastHighlightedIndex = -1;
+    const FILLER_WORDS = new Set(['um', 'uh', 'ah', 'er', 'like', 'so', 'you know', 'basically', 'actually']);
+
+    // --- PAGE RENDERING FUNCTIONS ---
+    function renderPracticeView() {
+        appContainer.innerHTML = `
+            <div class="practice-view-grid">
+                <div class="left-panel">
+                    <div id="script-input-panel" class="panel">
+                        <textarea id="script-input" placeholder="Paste your full script here..."></textarea>
+                        <button id="prepare-btn">Prepare Script with AI</button>
+                    </div>
+                </div>
+                <div id="caption-display-panel" class="panel">
+                    <video id="camera-preview" autoplay muted playsinline></video>
+                    <div id="caption-content">
+                         <span class="placeholder">Script will appear here.</span>
+                    </div>
+                </div>
+                <div class="footer">
+                    <button id="record-toggle-btn" title="Start Recording" disabled>
+                        ${ICONS.record}
+                    </button>
+                </div>
+            </div>`;
+        attachPracticeListeners();
+        startCameraPreview();
+    }
+    
+    function renderAnalysisView(metrics) {
+        appContainer.innerHTML = `
+            <div class="analysis-view-container">
+                <h1>Performance Report</h1>
+                <p class="subtitle">Here's a detailed breakdown of your last practice session.</p>
+                <div class="feedback-grid">
+                    <div class="metric"><span class="metric-label">AI Similarity</span><span class="metric-value">${metrics.aiAnalysis.similarityScore}<span class="unit">%</span></span></div>
+                    <div class="metric"><span class="metric-label">Pacing</span><span class="metric-value">${metrics.wpm}<span class="unit">WPM</span></span></div>
+                    <div class="metric"><span class="metric-label">Filler Words</span><span class="metric-value">${metrics.fillerCount}</span></div>
+                    <div class="metric"><span class="metric-label">Clarity</span><span class="metric-value">${metrics.clarity}<span class="unit">%</span></span></div>
+                </div>
+                
+                <div class="analysis-section">
+                    <h2>Playback & Personal Coaching</h2>
+                    <div class="playback-area">
+                        <div class="video-container">
+                             <video id="video-player" controls src="${metrics.videoUrl}"></video>
+                        </div>
+                        <div class="tips-container">
+                             <button id="get-tips-btn" class="btn-analysis" style="background-color:${'var(--success-color)'}; color:white; width:100%;">Generate Personal Tips</button>
+                             <div id="ai-tips-display" style="margin-top:1rem; padding:1rem; background:var(--panel-bg); border-radius:8px; min-height:150px;"></div>
+                        </div>
+                    </div>
+                    <div id="replay-transcript-container" style="margin-top: 1rem;">
+                        <div id="replay-transcript"></div>
+                    </div>
+                </div>
+
+                <div class="analysis-section">
+                    <h2>AI-Powered Feedback</h2>
+                    <div id="ai-deep-analysis">
+                        <p><strong>Repetition Analysis:</strong> ${metrics.aiAnalysis.repetitionAnalysis}</p>
+                        <p><strong>Extra Words Detected:</strong> ${metrics.aiAnalysis.extraWords.length > 0 ? metrics.aiAnalysis.extraWords.join(', ') : 'None'}</p>
+                    </div>
+                </div>
+
+                <div class="analysis-section">
+                    <h2>Transcript Comparison</h2>
+                    <div id="transcript-comparison"></div>
+                </div>
+                <div class="analysis-actions">
+                    <button id="back-to-practice-btn" class="btn-analysis" style="background-color:var(--primary-accent); color:white;">Practice Again</button>
+                </div>
+            </div>`;
+        
+        attachAnalysisListeners(metrics);
+    }
+    
+    // --- EVENT LISTENER ATTACHMENT ---
+    function attachPracticeListeners() {
+        document.getElementById('prepare-btn').addEventListener('click', handlePrepareScript);
+        document.getElementById('record-toggle-btn').addEventListener('click', toggleRecording);
+    }
+
+    function attachAnalysisListeners(metrics) {
+        // **MODIFIED:** The click handler is now more intelligent.
+        document.getElementById('back-to-practice-btn').addEventListener('click', handlePracticeAgainClick);
+        document.getElementById('get-tips-btn').addEventListener('click', () => handleGetTips(metrics));
+        renderTranscriptComparison(metrics.originalText, metrics.transcript);
+        setupKaraokeReplay(metrics.words, metrics.duration);
+    }
+
+    // --- AI API CALLS ---
+    async function getAIChunks(rawText) {
+        document.getElementById('prepare-btn').textContent = 'AI is processing...';
+        const systemPrompt = `You are a text processing API. Your SOLE function is to take the user's provided text and split it into a JSON array of speakable chunks. **DO NOT change, add, or summarize any of the original wording.** You must preserve the user's exact text. Simply re-format it. Chunks should be complete sentences or logical phrases. Respect paragraph and line breaks as indicators for new chunks. **DO NOT** provide any explanation, commentary, or markdown formatting like \`\`\`json. The output MUST be a single, valid JSON array and nothing else.`;
+        try {
+            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ model: "mistralai/mistral-7b-instruct:free", messages: [ { "role": "system", "content": systemPrompt }, { "role": "user", "content": rawText } ] })
+            });
+            if (!response.ok) throw new Error(`API request failed: ${response.statusText}`);
+            const data = await response.json();
+            const content = data.choices[0].message.content;
+            const jsonMatch = content.match(/\[.*\]/s);
+            if (!jsonMatch) throw new Error("AI returned invalid data format.");
+            return JSON.parse(jsonMatch[0]);
+        } finally {
+            document.getElementById('prepare-btn').textContent = 'Prepare Script with AI';
+        }
+    }
+    
+    async function getAIAnalysis(originalText, userText) {
+        const systemPrompt = `You are an expert speech coach API. Your task is to compare an original script to a user's transcript and provide a structured analysis.
+1.  **Similarity Score:** Calculate a 'similarityScore' from 0 to 100. This should be a semantic comparison. For example, 'four' and '4' are 100% similar. Minor differences in wording that preserve the meaning should have a minimal penalty.
+2.  **Extra Words:** Identify any meaningful words in the transcript that are NOT in the original script or direct synonyms. List them in an 'extraWords' array.
+3.  **Repetition Analysis:** Analyze the transcript for disfluencies like stutters ('I-I-I') or word repetitions ('like like'). Provide a brief, one-sentence summary in 'repetitionAnalysis'.
+Your output MUST be ONLY a valid JSON object with the keys: "similarityScore", "extraWords", "repetitionAnalysis". Do not add any other text or formatting.`;
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: "mistralai/mistral-7b-instruct:free", messages: [ { "role": "system", "content": systemPrompt }, { "role": "user", "content": `Original Script: "${originalText}"\n\nUser Transcript: "${userText}"` } ] })
+        });
+        if (!response.ok) throw new Error(`AI Analysis failed: ${response.statusText}`);
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        const jsonMatch = content.match(/{.*}/s);
+        if (!jsonMatch) throw new Error("AI analysis returned invalid data.");
+        return JSON.parse(jsonMatch[0]);
+    }
+
+    async function handleGetTips(metrics) {
+        const tipsBtn = document.getElementById('get-tips-btn');
+        const tipsDisplay = document.getElementById('ai-tips-display');
+        tipsBtn.textContent = 'Generating...';
+        tipsBtn.disabled = true;
+        const systemPrompt = `You are a world-class public speaking coach. Based on the following performance data, provide 3-5 specific, actionable, and non-generic tips for improvement. Frame the tips positively. Use markdown for formatting (e.g., lists, bolding).
+Data:
+- Pacing: ${metrics.wpm} WPM
+- AI Similarity Score: ${metrics.accuracy}%
+- Filler Words: ${metrics.fillerCount}
+- Clarity (Speech API Confidence): ${metrics.clarity}%
+- Repetition Analysis: ${metrics.aiAnalysis.repetitionAnalysis}
+- Extra Words Added: ${metrics.aiAnalysis.extraWords.join(', ') || 'None'}`;
+        try {
+            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ model: "mistralai/mistral-7b-instruct:free", messages: [ { "role": "system", "content": systemPrompt } ] })
+            });
+            if (!response.ok) throw new Error(`AI Tips failed: ${response.statusText}`);
+            const data = await response.json();
+            tipsDisplay.innerHTML = marked.parse(data.choices[0].message.content);
+        } catch(e) {
+            tipsDisplay.innerHTML = `<p><strong>Error generating tips:</strong> ${e.message}</p>`;
+        } finally {
+            tipsBtn.textContent = 'Generate Personal Tips';
+            tipsBtn.disabled = false;
+        }
+    }
+
+
+    // --- HELPER & CORE FUNCTIONS ---
+    async function initialize() {
+        renderPracticeView(); 
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) { alert("Speech Recognition API not supported in this browser."); return; }
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
+            setupMediaRecorderHandlers();
+            setupRecognitionHandlers();
+            initializeFeedbackModal();
+        } catch (err) {
+            alert("Camera or Microphone access denied. Please allow permissions to use this application.");
+        }
+    }
+
+    async function startCameraPreview() {
+        const videoEl = document.getElementById('camera-preview');
+        if (mediaStream && videoEl) videoEl.srcObject = mediaStream;
+    }
+
+    async function handlePrepareScript() {
+        const scriptInput = document.getElementById('script-input');
+        const captionContent = document.getElementById('caption-content');
+        const recordToggleBtn = document.getElementById('record-toggle-btn');
+        try {
+            fullScript = await getAIChunks(scriptInput.value);
+            normalizedScriptChunks = fullScript.map(chunk => normalizeText(chunk));
+            renderFullScript();
+            recordToggleBtn.disabled = false;
+        } catch (error) {
+            captionContent.innerHTML = `<span class="placeholder">${error.message}</span>`;
+            recordToggleBtn.disabled = true;
+        }
+    }
+    
+    function renderFullScript() {
+        const captionContent = document.getElementById('caption-content');
+        captionContent.innerHTML = '';
+        if (fullScript.length === 0) {
+            captionContent.innerHTML = `<span class="placeholder">Script is ready. Press record to start.</span>`;
+            return;
+        }
+        fullScript.forEach((chunk, index) => {
+            const chunkSpan = document.createElement('p');
+            chunkSpan.className = 'script-chunk';
+            chunkSpan.id = `chunk-${index}`;
+            chunkSpan.textContent = chunk;
+            captionContent.appendChild(chunkSpan);
+        });
+    }
+
+    function resetMetrics() {
+        performanceMetrics = { startTime: 0, endTime: 0, transcript: '', fillerCount: 0, confidenceSum: 0, confidenceCount: 0 };
+    }
+
+    function toggleRecording() {
+        if (isRecording) {
+            if (recognition) recognition.stop();
+        } else {
+            if (fullScript.length === 0) return;
+            resetMetrics();
+            videoChunks = [];
+            recognition.start();
+        }
+    }
+    
+    function normalizeText(text) {
+        if (typeof text !== 'string') {
+            return '';
+        }
+        return text.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    }
+
+
+    function calculateMatchScore(text, chunk) {
+        const spokenWords = new Set(normalizeText(text).split(/\s+/).filter(Boolean));
+        const chunkWords = new Set(normalizeText(chunk).split(/\s+/).filter(Boolean));
+        if (chunkWords.size === 0) return 0;
+        
+        let intersectionSize = 0;
+        for (const word of spokenWords) {
+            if (chunkWords.has(word)) {
+                intersectionSize++;
+            }
+        }
+        return intersectionSize / chunkWords.size;
+    }
+
+    function highlightBestMatchChunk(fullSpokenText) {
+        if (!isRecording || normalizedScriptChunks.length === 0 || lastHighlightedIndex >= normalizedScriptChunks.length - 1) {
+            return;
+        }
+
+        const nextChunkIndex = lastHighlightedIndex + 1;
+        const nextChunk = normalizedScriptChunks[nextChunkIndex];
+        const recentSpokenText = fullSpokenText.split(/\s+/).slice(-15).join(' ');
+        const scoreForNextChunk = calculateMatchScore(recentSpokenText, nextChunk);
+
+        if (scoreForNextChunk > 0.4) {
+             if (lastHighlightedIndex !== -1) {
+                 document.getElementById(`chunk-${lastHighlightedIndex}`)?.classList.remove('highlighted-chunk');
+             }
+             const newHighlightEl = document.getElementById(`chunk-${nextChunkIndex}`);
+             if (newHighlightEl) {
+                newHighlightEl.classList.add('highlighted-chunk');
+                newHighlightEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+             }
+             lastHighlightedIndex = nextChunkIndex;
+        }
+    }
+
+
+    // --- EVENT HANDLERS ---
+    function setupRecognitionHandlers() {
+        recognition.onstart = () => {
+            isRecording = true;
+            performanceMetrics.startTime = Date.now();
+            setRecordButtonState('stop');
+            document.getElementById('prepare-btn').disabled = true;
+            lastHighlightedIndex = -1; 
+            document.querySelectorAll('.script-chunk').forEach(el => el.classList.remove('highlighted-chunk'));
+            
+            const firstChunk = document.getElementById('chunk-0');
+            if (firstChunk) {
+                firstChunk.classList.add('highlighted-chunk');
+                lastHighlightedIndex = 0;
+            }
+            
+            if (mediaRecorder.state === 'inactive') mediaRecorder.start();
+        };
+
+        recognition.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscriptPart = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const result = event.results[i];
+                const transcript = result[0].transcript;
+
+                if (result.isFinal) {
+                    finalTranscriptPart += transcript + ' ';
+                    if (result[0].confidence > 0) {
+                        performanceMetrics.confidenceSum += result[0].confidence;
+                        performanceMetrics.confidenceCount++;
+                    }
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+
+            if (finalTranscriptPart) {
+                performanceMetrics.transcript += finalTranscriptPart;
+                finalTranscriptPart.toLowerCase().split(/\s+/).forEach(w => {
+                    if (FILLER_WORDS.has(w)) performanceMetrics.fillerCount++;
+                });
+            }
+            
+            highlightBestMatchChunk(performanceMetrics.transcript + interimTranscript);
+        };
+        
+        recognition.onend = () => { if (mediaRecorder.state === "recording") mediaRecorder.stop(); };
+        recognition.onerror = (e) => { if (mediaRecorder.state === "recording") mediaRecorder.stop(); console.error(`Speech Recognition Error: ${e.error}`); };
+    }
+    
+    function setupMediaRecorderHandlers() {
+        mediaRecorder.ondataavailable = e => videoChunks.push(e.data);
+        mediaRecorder.onstop = async () => {
+            isRecording = false;
+            setRecordButtonState('record');
+            const prepareBtn = document.getElementById('prepare-btn');
+            if (prepareBtn) prepareBtn.disabled = false;
+            performanceMetrics.endTime = Date.now();
+            if (videoChunks.length > 0) {
+                const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+                if (videoUrl) URL.revokeObjectURL(videoUrl);
+                videoUrl = URL.createObjectURL(videoBlob);
+                if (performanceMetrics.startTime > 0) await analyzeAndRenderFeedback();
+            }
+        };
+    }
+    
+    // --- ANALYSIS & REPLAY ---
+    async function analyzeAndRenderFeedback() {
+        const duration = (performanceMetrics.endTime - performanceMetrics.startTime) / 1000;
+        const words = performanceMetrics.transcript.trim().split(/\s+/).filter(Boolean);
+        const wpm = duration > 1 ? Math.round((words.length / duration) * 60) : 0;
+        const originalText = fullScript.join(' ');
+        const clarity = performanceMetrics.confidenceCount > 0 ? Math.round((performanceMetrics.confidenceSum / performanceMetrics.confidenceCount) * 100) : 0;
+        
+        let aiAnalysis;
+        try {
+            aiAnalysis = await getAIAnalysis(originalText, performanceMetrics.transcript);
+        } catch (e) {
+            console.error(e);
+            aiAnalysis = { similarityScore: 'N/A', extraWords: [], repetitionAnalysis: 'AI analysis failed.' };
+        }
+        
+        const finalMetrics = {
+            accuracy: aiAnalysis.similarityScore, wpm, fillerCount: performanceMetrics.fillerCount, clarity,
+            videoUrl, words, duration, originalText, transcript: performanceMetrics.transcript, aiAnalysis
+        };
+
+        renderAnalysisView(finalMetrics);
+    }
+
+    function renderTranscriptComparison(original, transcript) {
+        const userWords = normalizeText(transcript).split(/\s+/);
+        const userWordCounts = userWords.reduce((map, word) => {
+            map[word] = (map[word] || 0) + 1;
+            return map;
+        }, {});
+
+        const originalWords = original.split(/\s+/);
+        let html = "<strong>Original Script:</strong>\n";
+        originalWords.forEach(word => {
+            const normalizedWord = normalizeText(word);
+            if (userWordCounts[normalizedWord] && userWordCounts[normalizedWord] > 0) {
+                html += `<span class="correct-word">${word}</span> `;
+                userWordCounts[normalizedWord]--;
+            } else {
+                html += `<span class="incorrect-word">${word}</span> `;
+            }
+        });
+        html += "\n\n<strong>Your Transcript:</strong>\n" + transcript.trim();
+        document.getElementById('transcript-comparison').innerHTML = html;
+    }
+
+    function setupKaraokeReplay(words, duration) {
+        const replayEl = document.getElementById('replay-transcript');
+        const videoEl = document.getElementById('video-player');
+        
+        replayEl.innerHTML = '';
+        document.getElementById('replay-transcript-container').style.display = words.length > 0 ? 'block' : 'none';
+        if (words.length === 0) return;
+        
+        const timePerWord = duration > 0 ? duration / words.length : 0.2;
+        const wordTimings = words.map((word, i) => ({ word, start: i * timePerWord }));
+
+        wordTimings.forEach(({ word }, i) => {
+            const span = document.createElement('span');
+            span.textContent = word + ' ';
+            span.className = 'replay-word';
+            span.id = `replay-word-${i}`;
+            replayEl.appendChild(span);
+        });
+        
+        let lastActiveIndex = -1;
+        videoEl.ontimeupdate = () => {
+            const currentTime = videoEl.currentTime;
+            let activeIndex = -1;
+            for(let i = wordTimings.length - 1; i >= 0; i--) {
+                if (currentTime >= wordTimings[i].start) { activeIndex = i; break; }
+            }
+            if (activeIndex !== lastActiveIndex) {
+                if (lastActiveIndex !== -1) document.getElementById(`replay-word-${lastActiveIndex}`)?.classList.remove('active');
+                if (activeIndex !== -1) document.getElementById(`replay-word-${activeIndex}`)?.classList.add('active');
+                lastActiveIndex = activeIndex;
+            }
+        };
+        const stopReplay = () => {
+             document.querySelectorAll('.replay-word.active').forEach(el => el.classList.remove('active'));
+             lastActiveIndex = -1;
+        };
+        videoEl.onpause = stopReplay;
+        videoEl.onended = stopReplay;
+    }
+    
+    function setRecordButtonState(state) {
+        const recordToggleBtn = document.getElementById('record-toggle-btn');
+        if (recordToggleBtn) {
+            recordToggleBtn.innerHTML = (state === 'record') ? ICONS.record : ICONS.stop;
+            recordToggleBtn.classList.toggle('recording', state === 'stop');
+        }
+    }
+
+    // --- FEEDBACK MODAL LOGIC ---
+    function initializeFeedbackModal() {
+        const modal = document.getElementById('feedback-modal');
+        const closeBtn = document.getElementById('close-feedback-btn');
+
+        // This function now handles closing the modal AND proceeding to the next step
+        const closeAndProceed = () => {
+            modal.style.display = 'none';
+            // Set the flag so the modal never shows again
+            localStorage.setItem('feedbackModalShown', 'true');
+            // Go to the practice view
+            renderPracticeView();
+        };
+
+        closeBtn.addEventListener('click', closeAndProceed);
+    }
+    
+    /**
+     * **NEW FUNCTION**
+     * This function decides whether to show the feedback modal or go straight to the practice view.
+     */
+    function handlePracticeAgainClick() {
+        // Check if the feedback modal has been shown before
+        if (localStorage.getItem('feedbackModalShown') !== 'true') {
+            // If not, show the modal. The modal's 'close' button will handle the rest.
+            const modal = document.getElementById('feedback-modal');
+            modal.style.display = 'flex';
+        } else {
+            // If it has been shown, just go directly to the practice view.
+            renderPracticeView();
+        }
+    }
+
+
+    initialize().catch(console.error);
+</script>
+</body>
+</html>
